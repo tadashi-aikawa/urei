@@ -3,7 +3,7 @@ package inspection
 import (
 	"cmp"
 	"github.com/go-resty/resty/v2"
-	"log"
+	"log/slog"
 	"slices"
 )
 
@@ -25,9 +25,9 @@ type AsyncResult struct {
 
 func inspect(seq int, record Seed) (*Result, error) {
 	client := resty.New()
-	log.Printf("request %d", seq)
+	slog.Info("request", "seq", seq)
 	r, err := client.R().Get(record.Url)
-	log.Printf("response %d", seq)
+	slog.Info("response", "seq", seq)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func InspectRecords(records []Seed, concurrency int) (results []Result) {
 	for _ = range records {
 		result := <-asyncResultsChan
 		if result.Err != nil {
-			log.Fatal(result.Err)
+			slog.Error(result.Err.Error())
 		} else {
 			results = append(results, *result.Value)
 		}
