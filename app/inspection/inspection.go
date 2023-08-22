@@ -2,6 +2,7 @@ package inspection
 
 import (
 	"cmp"
+	"github.com/cheggaaa/pb/v3"
 	"github.com/go-resty/resty/v2"
 	"log/slog"
 	"slices"
@@ -25,9 +26,9 @@ type AsyncResult struct {
 
 func inspect(seq int, record Seed) (*Result, error) {
 	client := resty.New()
-	slog.Info("request", "seq", seq)
+	slog.Debug("request", "seq", seq)
 	r, err := client.R().Get(record.Url)
-	slog.Info("response", "seq", seq)
+	slog.Debug("response", "seq", seq)
 	if err != nil {
 		return nil, err
 	}
@@ -38,14 +39,18 @@ func inspect(seq int, record Seed) (*Result, error) {
 func InspectRecords(records []Seed, concurrency int) (results []Result) {
 	semChan := make(chan struct{}, concurrency)
 	asyncResultsChan := make(chan AsyncResult, len(records))
+	progress := pb.StartNew(len(records))
 
 	for i, record := range records {
 		i := i
 		record := record
 		go func() {
 			semChan <- struct{}{}
+
+			progress.Increment()
 			r, err := inspect(i+1, record)
 			asyncResultsChan <- AsyncResult{Value: r, Err: err}
+
 			<-semChan
 		}()
 	}
