@@ -6,6 +6,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"log/slog"
 	"slices"
+	"strconv"
 )
 
 type Seed struct {
@@ -14,31 +15,27 @@ type Seed struct {
 }
 
 type Result struct {
-	No     int  `csv:"id"`
-	Status int  `csv:"status"`
-	Origin Seed `csv:"-"`
+	No     int    `csv:"id"`
+	Status string `csv:"status"`
+	Origin Seed   `csv:"-"`
 }
 
-type AsyncResult struct {
-	Value *Result
-	Err   error
-}
-
-func inspect(seq int, record Seed) (*Result, error) {
+func inspect(seq int, record Seed) Result {
 	client := resty.New()
 	slog.Debug("request", "seq", seq)
 	r, err := client.R().Get(record.Url)
 	slog.Debug("response", "seq", seq)
 	if err != nil {
-		return nil, err
+		slog.Error(err.Error())
+		return Result{No: seq, Status: "error", Origin: record}
 	}
 
-	return &Result{No: seq, Status: r.StatusCode(), Origin: record}, nil
+	return Result{No: seq, Status: strconv.Itoa(r.StatusCode()), Origin: record}
 }
 
 func InspectRecords(records []Seed, concurrency int) (results []Result) {
 	semChan := make(chan struct{}, concurrency)
-	asyncResultsChan := make(chan AsyncResult, len(records))
+	resultChan := make(chan Result, len(records))
 	progress := pb.StartNew(len(records))
 
 	for i, record := range records {
@@ -48,20 +45,15 @@ func InspectRecords(records []Seed, concurrency int) (results []Result) {
 			semChan <- struct{}{}
 
 			progress.Increment()
-			r, err := inspect(i+1, record)
-			asyncResultsChan <- AsyncResult{Value: r, Err: err}
+			resultChan <- inspect(i+1, record)
 
 			<-semChan
 		}()
 	}
 
 	for _ = range records {
-		result := <-asyncResultsChan
-		if result.Err != nil {
-			slog.Error(result.Err.Error())
-		} else {
-			results = append(results, *result.Value)
-		}
+		result := <-resultChan
+		results = append(results, result)
 	}
 
 	slices.SortFunc(
