@@ -53,7 +53,7 @@ func InspectRecords(records []Seed, concurrency int) (results []Result) {
 		}()
 	}
 
-	for _ = range records {
+	for range records {
 		result := <-resultChan
 		results = append(results, result)
 	}
