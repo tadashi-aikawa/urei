@@ -16,6 +16,8 @@ type Seed struct {
 
 type Result struct {
 	No     int    `csv:"id"`
+	Name   string `csv:"name"`
+	Url    string `csv:"url"`
 	Status string `csv:"status"`
 	Origin Seed   `csv:"-"`
 }
@@ -27,10 +29,10 @@ func inspect(seq int, record Seed) Result {
 	slog.Debug("response", "seq", seq)
 	if err != nil {
 		slog.Error(err.Error())
-		return Result{No: seq, Status: "error", Origin: record}
+		return Result{No: seq, Name: record.Name, Url: record.Url, Status: "error", Origin: record}
 	}
 
-	return Result{No: seq, Status: strconv.Itoa(r.StatusCode()), Origin: record}
+	return Result{No: seq, Name: record.Name, Url: record.Url, Status: strconv.Itoa(r.StatusCode()), Origin: record}
 }
 
 func InspectRecords(records []Seed, concurrency int) (results []Result) {
