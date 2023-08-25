@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"slices"
 	"strconv"
+	"time"
 )
 
 type Seed struct {
@@ -15,11 +16,12 @@ type Seed struct {
 }
 
 type Result struct {
-	No     int    `csv:"id"`
-	Name   string `csv:"name"`
-	Url    string `csv:"url"`
-	Status string `csv:"status"`
-	Origin Seed   `csv:"-"`
+	No           int        `csv:"id"`
+	Name         string     `csv:"name"`
+	Url          string     `csv:"url"`
+	Status       string     `csv:"status"`
+	Origin       Seed       `csv:"-"`
+	LastModified *time.Time `csv:"lastModified"`
 }
 
 func inspect(seq int, record Seed) Result {
@@ -32,7 +34,19 @@ func inspect(seq int, record Seed) Result {
 		return Result{No: seq, Name: record.Name, Url: record.Url, Status: "error", Origin: record}
 	}
 
-	return Result{No: seq, Name: record.Name, Url: record.Url, Status: strconv.Itoa(r.StatusCode()), Origin: record}
+	var lastModified *time.Time
+	l := r.Header().Get("Last-Modified")
+	if l != "" {
+		t, err := time.Parse(time.RFC1123, l)
+		if err != nil {
+			slog.Error(err.Error())
+			return Result{No: seq, Name: record.Name, Url: record.Url, Status: "error", Origin: record}
+		}
+		lastModified = &t
+	}
+
+	return Result{No: seq, Name: record.Name, Url: record.Url, Status: strconv.Itoa(r.StatusCode()), Origin: record,
+		LastModified: lastModified}
 }
 
 func InspectRecords(records []Seed, concurrency int) (results []Result) {
